@@ -1,5 +1,7 @@
 ﻿using APIProject.Application.Commands.NotificationCommands;
 using APIProject.Application.Commands.NotificationQueries;
+using Azure.Core;
+using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +13,12 @@ namespace APIProject.Controllers
     {
 
         private readonly ISender _sender;
+        private readonly IValidator<CreateNotificationCommand> _validator;
 
-        public NotificationsController(ISender sender) 
+        public NotificationsController(ISender sender, IValidator<CreateNotificationCommand> validator) 
         { 
             _sender = sender;
+            _validator = validator;
         }
 
         /// <summary>
@@ -26,6 +30,13 @@ namespace APIProject.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(CreateNotificationCommand command, CancellationToken cancellationToken)
         {
+            var validationResult = await _validator.ValidateAsync(command);
+
+            if (!validationResult.IsValid)
+            {
+                return BadRequest(validationResult.ToDictionary());
+            }
+
             var result = await _sender.Send(command, cancellationToken);
             return CreatedAtAction(nameof(Create), new { id = result.Id }, result);
         }

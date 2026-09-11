@@ -1,10 +1,16 @@
 using APIProject.Application.Commands.NotificationCommands;
+using APIProject.Infraestructure.Messaging;
 using APIProject.Infraestructure.Persistance;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.AddHostedService<OutboxProcessor>();
+builder.Services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddMediatR(options =>
 {
     options.RegisterServicesFromAssembly(typeof(CreateNotificationCommand).Assembly);
