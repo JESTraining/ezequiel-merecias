@@ -21,7 +21,12 @@ namespace NotificationDeliveryServices.Providers
 
         public async Task SendAsync(NotificationCreatedEvent notification, CancellationToken cancellationToken)
         {
-            await Task.Delay(100, cancellationToken);
+            await Task.Delay(500, cancellationToken);
+
+            if(notification.Subject.Contains("[FAIL]", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception("Email provider failed");
+            }
 
             logger.LogInformation("Email sent Id:{NotificationId}", notification.NotificationId);
         }

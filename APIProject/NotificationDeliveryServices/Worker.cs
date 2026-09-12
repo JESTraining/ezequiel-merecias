@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Text;
 using NotificationDeliveryServices.Contracts;
 using Microsoft.Extensions.Options;
+using NotificationDeliveryServices.Data.Contexts;
+using Microsoft.EntityFrameworkCore;
 
 namespace NotificationDeliveryServices
 {
@@ -14,12 +16,17 @@ namespace NotificationDeliveryServices
         private readonly ILogger<Worker> logger;
         private readonly RabbitMqOptions options;
         private readonly NotificationProviderResolver providerResolver;
+        private readonly IServiceScopeFactory scopeFactory;
+        private readonly RabbitMqEventPublisher eventPublisher;
 
-        public Worker(ILogger<Worker> _logger, NotificationProviderResolver _providerResolver, IOptions<RabbitMqOptions> _options)
+        public Worker(ILogger<Worker> _logger, NotificationProviderResolver _providerResolver, IOptions<RabbitMqOptions> _options,
+            IServiceScopeFactory _scopeFactory, RabbitMqEventPublisher _eventPublisher)
         {
             logger = _logger;
             providerResolver = _providerResolver;
             options = _options.Value;
+            scopeFactory = _scopeFactory;
+            eventPublisher = _eventPublisher;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,11 +88,12 @@ namespace NotificationDeliveryServices
 
         private async Task HandleMessageAsync(IChannel channel, BasicDeliverEventArgs eventArgs, CancellationToken cancellationToken)
         {
+            NotificationCreatedEvent? notification = null;
             try
             {
                 var json = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
 
-                var notification = JsonSerializer.Deserialize<NotificationCreatedEvent>(json, new JsonSerializerOptions
+                notification = JsonSerializer.Deserialize<NotificationCreatedEvent>(json, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
@@ -95,11 +103,40 @@ namespace NotificationDeliveryServices
                     throw new Exception("Error trying to deserialize notification message.");
                 }
 
+                using var scope = scopeFactory.CreateScope();
+
+                var context = scope.ServiceProvider.GetRequiredService<DeliveryContext>();
+
+                var anyProcessed = await context.ProcessedMessages.AnyAsync(x => x.MessageId == notification.MessageId, cancellationToken);
+
+                if (anyProcessed)
+                {
+                    //communicate with ACK message has been processed
+                    await channel.BasicAckAsync(deliveryTag: eventArgs.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
+
+                    logger.LogInformation("message {MessageId} has been processed. Skipped", notification.MessageId);
+
+                    return;
+                }
+
                 logger.LogInformation("Notification received: {NotificationId}", notification.NotificationId);
 
                 var provider = providerResolver.Resolve(notification.Channel);
 
-                await provider.SendAsync(notification, cancellationToken);
+                //await provider.SendAsync(notification, cancellationToken);
+                await RetryAsync(notification, cancellationToken);
+
+                var deliveredEvent = new NotificationDeliveredEvent(Guid.NewGuid(), notification.NotificationId, DateTime.Now);
+
+                await eventPublisher.PublishAsync("notification.delivered", JsonSerializer.Serialize(deliveredEvent), cancellationToken);
+
+                context.ProcessedMessages.Add(new Data.Entities.ProcessedMessage
+                {
+                    MessageId = notification.MessageId,
+                    ProcessedDate = DateTime.Now
+                });
+
+                await context.SaveChangesAsync(cancellationToken);
 
                 await channel.BasicAckAsync(deliveryTag: eventArgs.DeliveryTag, multiple: false, cancellationToken: cancellationToken);
 
@@ -107,9 +144,41 @@ namespace NotificationDeliveryServices
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error processing notification message");
+                logger.LogError(ex, "Error processing notification message after trying 4 attemps");
 
+                if(notification != null)
+                {
+                    var failedEvent = new NotificationFailedEvent(Guid.NewGuid(), notification.NotificationId, ex.Message, DateTime.Now);
+
+                    await eventPublisher.PublishAsync("notification.failed", JsonSerializer.Serialize(failedEvent), cancellationToken);
+                }
+
+                //requeue in false to avoid infinite loop
                 await channel.BasicNackAsync(deliveryTag: eventArgs.DeliveryTag, multiple: false, requeue: false, cancellationToken: cancellationToken);
+            }
+        }
+
+        //Add retry for resilient
+        private async Task RetryAsync(NotificationCreatedEvent notification, CancellationToken cancellationToken)
+        {
+            const int maxRetries = 3;
+            var provider = providerResolver.Resolve(notification.Channel);
+
+            for (var i = 0; ; i++)
+            {
+                try
+                {
+                    await provider.SendAsync(notification, cancellationToken);
+                    return;
+                }
+                catch(Exception ex) when(i < maxRetries)
+                {
+                    var delay = Math.Pow(2, i); //increase the time to retry again in case timeout/error spent more time that expected (exponential backoff)
+
+                    logger.LogError(ex, "Delivery failed. Retry in {seconds}", delay);
+
+                    await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
+                }
             }
         }
     }

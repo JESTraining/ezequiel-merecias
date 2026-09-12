@@ -7,10 +7,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "APIProject", "APIProject\AP
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Elementos de la solución", "Elementos de la solución", "{35B5C3E8-35AD-4B44-935B-92668353BF76}"
 	ProjectSection(SolutionItems) = preProject
+		docker-compose.yml = docker-compose.yml
 		README.md = README.md
+		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationDeliveryServices", "NotificationDeliveryServices\NotificationDeliveryServices.csproj", "{7A781EC7-2B10-49D4-ADC6-292BD22E8C88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NotificationDeliveryServices", "NotificationDeliveryServices\NotificationDeliveryServices.csproj", "{7A781EC7-2B10-49D4-ADC6-292BD22E8C88}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationTests", "NotificationTests\NotificationTests.csproj", "{D0E249E5-C30C-4954-99A4-8D434FA749B2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -26,6 +30,10 @@ Global
 		{7A781EC7-2B10-49D4-ADC6-292BD22E8C88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7A781EC7-2B10-49D4-ADC6-292BD22E8C88}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7A781EC7-2B10-49D4-ADC6-292BD22E8C88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D0E249E5-C30C-4954-99A4-8D434FA749B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D0E249E5-C30C-4954-99A4-8D434FA749B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D0E249E5-C30C-4954-99A4-8D434FA749B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D0E249E5-C30C-4954-99A4-8D434FA749B2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -25,5 +25,15 @@ namespace APIProject.Domain.Entities
             Status = NotificationStatusEnum.Pending;
         }
 
+        public void MarkAsDelivered()
+        {
+            Status = NotificationStatusEnum.Delivered;
+        }
+
+        public void MarkAsFailed()
+        {
+            Status = NotificationStatusEnum.Failed;
+        }
+
     }
 }

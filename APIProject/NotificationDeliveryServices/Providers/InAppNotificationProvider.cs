@@ -21,7 +21,7 @@ namespace NotificationDeliveryServices.Providers
 
         public async Task SendAsync(NotificationCreatedEvent notification, CancellationToken cancellationToken)
         {
-            await Task.Delay(100, cancellationToken);
+            await Task.Delay(500, cancellationToken);
 
             logger.LogInformation("App Notification sent Id:{NotificationId}", notification.NotificationId);
         }
